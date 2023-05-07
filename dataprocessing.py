@@ -5,6 +5,15 @@ import openai
 from collections import defaultdict
 from datetime import datetime
 from dotenv import load_dotenv
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_random_exponential,
+)  # for exponential backoff
+
+@retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
+def completion_with_backoff(**kwargs):
+    return openai.Completion.create(**kwargs)
 
 load_dotenv()
 
@@ -38,6 +47,7 @@ def generate_json_output(monthly_data):
     return json.dumps(output, indent=2)
 
 def generate_insights(monthly_data):
+    
     prompt = "Generate insights for the following monthly sales data:\n\n"
 
     for month, data in monthly_data.items():
@@ -45,8 +55,8 @@ def generate_insights(monthly_data):
 
     prompt += "\nInsights:"
 
-    response = openai.Completion.create(
-        engine="text-davinci-002",
+    response = completion_with_backoff(
+        engine="gpt-3.5-turbo",
         prompt=prompt,
         temperature=0.5,
         max_tokens=150,
@@ -60,6 +70,7 @@ def generate_insights(monthly_data):
 
 
 
+
 csv_file = "invoices.csv"
 monthly_data = process_csv(csv_file)
 json_output = generate_json_output(monthly_data)
@@ -69,4 +80,5 @@ print(json_output)
 insights = generate_insights(monthly_data)
 print("\nGenerated Insights:")
 print(insights)
+
 
